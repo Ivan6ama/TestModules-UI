@@ -1,52 +1,24 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
+#include "config.h"
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
 {
+
     ui->setupUi(this);
 
-    serialPort = new QSerialPort(this);
+    ui->tabWidget->setCurrentIndex(2);  // Muestra la primera pestaña
 
-    connect(serialPort,&QSerialPort::readyRead,this,&MainWindow::on_serialPort_Rx);
-
-    ui->comboBoxPorts->addItem("COM5");
-    ui->comboBoxPorts->addItem("COM3");
-    ui->comboBoxPorts->addItem("COM9");
-    ui->comboBoxPorts->addItem("COM12");
-
-    ui->buttonOpenPort->setText("OPEN");
-    ui->buttonSendSerial->setText("SEN");
+    ui->comboBoxData->addItem("ALIVE", 0xF0);
+    ui->comboBoxData->addItem("UIMOTORS", 0x01);
+    ui->comboBoxData->addItem("UIDISPLAY", 0x02);
 }
 
 MainWindow::~MainWindow()
 {
     delete ui;
-}
-
-
-void MainWindow::on_buttonOpenPort_clicked()
-{
-    if(serialPort->isOpen()){
-        serialPort->close();
-        ui->buttonOpenPort->setText("OPEN");
-    }else{
-        serialPort->setPortName(ui->comboBoxPorts->currentText());
-        serialPort->setBaudRate(QSerialPort::Baud115200);
-        if(serialPort->open(QSerialPort::ReadWrite)){
-            ui->buttonOpenPort->setText("CLOSE");
-        }
-    }
-}
-
-
-void MainWindow::on_buttonSendSerial_clicked()
-{
-    uint8_t id;
-
-    id = ALIVE;
-    send_Data_Serial(id);
 }
 
 void MainWindow::on_serialPort_Rx()
@@ -154,6 +126,26 @@ void MainWindow::send_Data_Serial(uint8_t ID)
 
             bufTx[NBYTES] = 2;
             break;
+        case FIRMWARE:
+            ui->plainTextTX->appendPlainText(">> Cual es tu Firmware");
+
+            bufTx[index++] = FIRMWARE;
+
+            bufTx[NBYTES] = 2;
+            break;
+        case UIMOTORS:
+            bufTx[index++] = UIMOTORS;
+
+            lSpeed = ui->plainTextLeftMotor->toPlainText().toInt();
+            rSpeed = ui->plainTextRightMotor->toPlainText().toInt();
+
+            bufTx[index++] = lSpeed;
+            bufTx[index++] = rSpeed;
+
+            bufTx[NBYTES] = 4;
+            break;
+        case UIDISPLAY:
+            break;
         default:
             break;
         }
@@ -199,6 +191,9 @@ void MainWindow::decode_Payload(uint8_t *buf)
         w.ui8[1] = buf[7];
         ui->plainTextRX->appendPlainText("Sensor Derecha:" + QString("%1").arg(w.ui16[0], 2, 10, QChar('0')));
         break;*/
+    case UIMOTORS:
+        ui->plainTextRX->appendPlainText("Motores cargados");
+        break;
     default:
         w.ui8[0] = buf[2];
         w.ui8[1] = buf[3];
@@ -206,5 +201,47 @@ void MainWindow::decode_Payload(uint8_t *buf)
         ui->plainTextRX->appendPlainText("COMANDO DESCONOCIDO");
         break;
     }
+}
+
+
+void MainWindow::on_buttonOpenConfig_clicked()
+{
+    Config *configWindow = new Config(this);
+    configWindow->show();
+
+    // Conectás la señal ANTES de mostrar
+    connect(configWindow, &Config::config_Port, this, [=](QSerialPort *puerto){
+        this->serialPort = puerto;
+        connect(serialPort, &QSerialPort::readyRead, this, &MainWindow::on_serialPort_Rx);
+    });
+    connect(configWindow, &Config::conection_State, this, &MainWindow::update_Indicator);
+
+    //configWindow->exec(); // modal
+    //configWindow->deleteLater();
+}
+
+void MainWindow::update_Indicator(bool conected)
+{
+    if (conected) {
+        ui->labelSerialConected->setStyleSheet("background-color: green; border-radius: 15px;");
+    } else {
+        ui->labelSerialConected->setStyleSheet("background-color: grey; border-radius: 15px;");
+    }
+}
+
+
+void MainWindow::on_button_Clean_clicked()
+{
+    ui->plainTextRX->clear();
+    ui->plainTextTX->clear();
+}
+
+
+void MainWindow::on_buttonDebugSendData_clicked()
+{
+    uint8_t id;
+
+    id = ui->comboBoxData->currentData().toInt();
+    send_Data_Serial(id);
 }
 

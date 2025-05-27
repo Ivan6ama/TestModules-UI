@@ -3,6 +3,8 @@
 
 #include <QMainWindow>
 #include <QtSerialPort/QSerialPort>
+#include <QtSerialPort/QSerialPortInfo>
+#include <QComboBox>
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -13,6 +15,9 @@ QT_END_NAMESPACE
 
 typedef enum{
     ALIVE           = 0xF0,
+    FIRMWARE 		= 0xF1,
+    UIMOTORS        = 0X01,
+    UIDISPLAY       = 0x02,
 }_eCMD;
 
 typedef enum{
@@ -51,12 +56,16 @@ public:
     ~MainWindow();
 
 private slots:
-    void on_buttonOpenPort_clicked();
-    void on_buttonSendSerial_clicked();
-
     void on_serialPort_Rx();
     void send_Data_Serial(uint8_t ID);
     void decode_Payload(uint8_t *buf);
+
+
+    void update_Indicator(bool conected);
+
+    void on_buttonOpenConfig_clicked();
+    void on_button_Clean_clicked();
+    void on_buttonDebugSendData_clicked();
 
 private:
     Ui::MainWindow *ui;
@@ -66,10 +75,13 @@ private:
 
 
     /* Serial communication variables -----------------------------------------------------------------*/
-    QSerialPort             *serialPort;
+    QSerialPort             *serialPort = nullptr;
     _sData                  rxData;
     _eCMD                   ID;
     _eProtocol              protocolState;
     uint8_t                 writeFlag;
+    uint8_t                 serialCommand;
+    int8_t                  lSpeed;
+    int8_t                  rSpeed;
 };
 #endif // MAINWINDOW_H
